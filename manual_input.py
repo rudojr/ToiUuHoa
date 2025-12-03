@@ -46,7 +46,10 @@ while len(user_materials) < 4:
 
 print("User selected:", user_materials)
 
+# user_materials = ['m7','m8','m9','m10']
 selected = ['m1','m2'] + user_materials
+print("User selected:", selected)
+
 sub = df[df.material.isin(selected)].reset_index(drop=True)
 
 p_m1 = 0.06
@@ -58,18 +61,28 @@ remaining = 1 - fixed_total
 A_ub = []
 b_ub = []
 
-A_ub.append(sub.density_min.values)
-b_ub.append(target_density)
+#ràng buộc mật độ min/max
+# A_ub.append(sub.density_min.values)
+# b_ub.append(target_density)
+#
+# A_ub.append(-sub.density_max.values)
+# b_ub.append(-target_density)
 
-A_ub.append(-sub.density_max.values)
-b_ub.append(-target_density)
+density_avg = (sub.density_min.values + sub.density_max.values) / 2
+volume_coeff = concrete_mass / density_avg
+
+A_ub.append(volume_coeff)
+b_ub.append(volume_L)
+
+A_ub.append(-volume_coeff)
+b_ub.append(-volume_L * 0.97)
 
 A_eq = [ [1]*len(selected) ]
 b_eq = [1]
 
 bounds = []
-min_user = 0.1
-max_user = 0.4
+min_user = 0.01
+max_user = 0.6
 for m in sub.material:
     if m == 'm1': bounds.append((p_m1,p_m1))
     elif m == 'm2': bounds.append((p_m2,p_m2))
@@ -82,6 +95,7 @@ res = linprog(prices_for_lp, A_ub=A_ub, b_ub=b_ub,A_eq=A_eq, b_eq=b_eq,bounds=bo
 
 if not res.success:
     print("No feasible solution.")
+    print("reason", res.message)
     exit()
 
 solution = res.x
@@ -96,8 +110,15 @@ result = pd.DataFrame({
         })
 
 result['proportion'] = (solution * 100).round(2).astype(str) + '%'
+result['density_avg'] = (result['density_min'] + result['density_max']) / 2
+result['volume_L'] = result['mass_kg'] / result['density_avg']
+total_volume = result['volume_L'].sum()
+
 print("Optimal Mix:")
 print(result)
 print(f"Total mass = {result.mass_kg.sum().astype(int)} kg")
 print(f"Total cost = {result.amount.sum():,.2f}")
 print(f"Cost per kg = {(result.amount.sum() / result.mass_kg.sum()).round(2)}")
+print(f"\nTotal volume = {total_volume:.2f} L")
+print(f"Lon volume limit = {volume_L} L")
+print(f"Remaining capacity = {volume_L - total_volume:.2f} L")
