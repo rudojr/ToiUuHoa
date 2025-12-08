@@ -97,8 +97,13 @@ def optimize_concrete_mix(total_weight):
         ]
 
         # Bounds cho 4 biến (tỉ lệ từ 0 đến 0.91)
-        bounds = Bounds([0, 0, 0, 0], [REMAINING_RATIO] * 4)
-
+        # bounds = Bounds([0, 0, 0, 0], [REMAINING_RATIO] * 4)
+        
+        bounds = Bounds(
+            [0.09, 0.09, 0.09, 0.09],  # min 9%
+            [0.5, 0.5, 0.5, 0.5]  # max 60%
+        )
+        
         # Giá trị khởi tạo
         x0 = np.array([REMAINING_RATIO / 4] * 4)
 
