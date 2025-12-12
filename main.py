@@ -10,8 +10,8 @@ import pandas as pd
 
 app = FastAPI()
 
-product_df = pd.read_csv("test/product.csv")
-material_df = pd.read_csv("test/material.csv")
+product_df = pd.read_csv("product.csv")
+material_df = pd.read_csv("material.csv")
 
 material_df.columns = [c.strip() for c in material_df.columns]
 product_df.columns = [c.strip() for c in product_df.columns]
