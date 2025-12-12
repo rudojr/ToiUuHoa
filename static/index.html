@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Concrete Mix Optimizer</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: '#1e40af',
+            success: '#16a34a',
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-gradient-to-br from-slate-50 to-slate-100 min-h-screen text-slate-800 font-sans">
+  <div class="max-w-6xl mx-auto p-6 mt-10">
+    <h1 class="text-4xl font-bold mb-10 text-center text-slate-800">Concrete Mix Optimizer</h1>
+
+    <!-- Input Form -->
+    <div class="bg-white p-8 rounded-2xl shadow-xl mb-8 border border-slate-200">
+
+      <!-- Product ID -->
+      <label class="block mb-3 text-lg font-semibold text-slate-700">Product ID</label>
+      <input
+        id="productId"
+        type="text"
+        class="w-full mb-6 px-5 py-4 text-lg border border-slate-300 rounded-xl focus:ring-4
+               focus:ring-blue-500 focus:border-transparent outline-none transition"
+        placeholder="E.g 849"
+      />
+
+      <!-- Total Weight -->
+      <label class="block mb-3 text-lg font-semibold text-slate-700">Total mass (kg)</label>
+      <div class="flex flex-col sm:flex-row gap-4">
+        <input
+          id="totalWeight"
+          type="number"
+          step="0.01"
+          class="flex-1 px-5 py-4 text-lg border border-slate-300 rounded-xl
+                 focus:ring-4 focus:ring-blue-500 focus:border-transparent outline-none transition"
+          placeholder="Input number of total mass, e.g 7600"
+        />
+        <button id="submitBtn" class="px-10 py-4 bg-gradient-to-r from-blue-600 to-blue-700
+                text-white rounded-xl hover:from-blue-700 hover:to-blue-800
+                transition-all font-semibold shadow-lg hover:shadow-xl transform hover:-translate-y-0.5">
+          Calculate
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="hidden text-center py-12">
+      <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+      <p class="mt-4 text-lg text-slate-600">Processing...</p>
+    </div>
+
+    <!-- Results -->
+    <div id="resultBox" class="hidden space-y-8">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="bg-gradient-to-br from-blue-600 to-blue-700 text-white p-6 rounded-2xl shadow-xl">
+          <p class="text-sm opacity-90">Total volume of concrete</p>
+          <p class="text-3xl font-bold mt-2" id="summaryMass">-</p>
+          <p class="text-sm opacity-80 mt-1">kg</p>
+        </div>
+        <div class="bg-gradient-to-br from-green-600 to-green-700 text-white p-6 rounded-2xl shadow-xl">
+          <p class="text-sm opacity-90">Total volume of the mixture</p>
+          <p class="text-3xl font-bold mt-2" id="summaryVolume">-</p>
+          <p class="text-sm opacity-80 mt-1">lit</p>
+        </div>
+        <div class="bg-gradient-to-br from-purple-600 to-purple-700 text-white p-6 rounded-2xl shadow-xl">
+          <p class="text-sm opacity-90">Mixture density</p>
+          <p class="text-3xl font-bold mt-2" id="summaryDensity">-</p>
+          <p class="text-sm opacity-80 mt-1">kg/lit</p>
+        </div>
+        <div class="bg-gradient-to-br from-orange-500 to-red-600 text-white p-6 rounded-2xl shadow-xl">
+          <p class="text-sm opacity-90">Total cost</p>
+          <p class="text-3xl font-bold mt-2" id="summaryCost">-</p>
+            <p class="text-sm opacity-80 mt-1">yen</p>
+        </div>
+      </div>
+
+      <!-- Materials Table -->
+      <div class="bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
+        <div class="px-8 py-5 bg-gradient-to-r from-slate-800 to-slate-900 text-white">
+          <h2 class="text-2xl font-bold">Result table</h2>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead class="bg-slate-50 border-b-2 border-slate-300">
+              <tr>
+                <th class="px-6 py-4 text-left text-sm font-bold text-slate-700">Material</th>
+                <th class="px-6 py-4 text-center text-sm font-bold text-slate-700">Proportion</th>
+                <th class="px-6 py-4 text-right text-sm font-bold text-slate-700">Mass</th>
+                <th class="px-6 py-4 text-right text-sm font-bold text-slate-700">Avg Density</th>
+                <th class="px-6 py-4 text-right text-sm font-bold text-slate-700">Range Density</th>
+                <th class="px-6 py-4 text-right text-sm font-bold text-slate-700">Unit Price</th>
+                <th class="px-6 py-4 text-right text-sm font-bold text-green-700">Total Price</th>
+              </tr>
+            </thead>
+            <tbody id="materialsTable" class="divide-y divide-slate-200"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function formatVND(num) {
+      return new Intl.NumberFormat('vi-VN').format(Math.round(num));
+    }
+    function formatNumber(num, decimals = 2) {
+      return new Intl.NumberFormat('vi-VN', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+      }).format(num);
+    }
+    function formatNumber_2(value, decimals = 2) {
+        if (value === null || value === undefined) return '-';
+
+        let num = Number(String(value).replace(",", "."));
+        if (isNaN(num)) return '-';
+
+        return parseFloat(num.toFixed(decimals)).toString();
+    }
+
+    function displayResults(data) {
+      document.getElementById('summaryMass').textContent = formatVND(data.concrete_weight);
+      document.getElementById('summaryVolume').textContent = formatNumber(data.total_volume, 3);
+      document.getElementById('summaryDensity').textContent = formatNumber(data.mix_density, 3);
+      document.getElementById('summaryCost').textContent = formatVND(data.cost);
+
+      const tbody = document.getElementById('materialsTable');
+      tbody.innerHTML = '';
+
+      data.materials.forEach((mat, i) => {
+        const row = document.createElement('tr');
+        row.className = i % 2 === 0 ? 'bg-white hover:bg-slate-50' : 'bg-slate-50 hover:bg-slate-100';
+
+        row.innerHTML = `
+          <td class="px-6 py-4 font-medium">${mat.material}</td>
+          <td class="px-6 py-4 text-center text-blue-700 font-semibold">${(mat.ratio * 100).toFixed(0)}%</td>
+          <td class="px-6 py-4 text-right">${formatNumber(mat.weight, 3)} kg</td>
+          <td class="px-6 py-4 text-right">${formatNumber_2(mat.density_avg, 3)}</td>
+          <td class="px-6 py-4 text-right text-sm">${mat.density_min} - ${mat.density_max}</td>
+          <td class="px-6 py-4 text-right">${formatVND(mat.price)}</td>
+          <td class="px-6 py-4 text-right text-green-600 font-bold">${formatVND(mat.weight * mat.price, 3)}</td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      document.getElementById('resultBox').classList.remove('hidden');
+    }
+
+    document.getElementById('submitBtn').addEventListener('click', async () => {
+      const productId = document.getElementById('productId').value.trim();
+      const total = parseFloat(document.getElementById('totalWeight').value);
+
+      if (!productId) {
+        alert("Vui lòng nhập product_id!");
+        return;
+      }
+      if (isNaN(total) || total <= 0) {
+        alert("Vui lòng nhập khối lượng hợp lệ (> 0 kg)");
+        return;
+      }
+
+      document.getElementById('loading').classList.remove('hidden');
+      document.getElementById('resultBox').classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/optimize', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            product_id: productId,
+            total_weight: total
+          })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => null);
+          console.log(errData)
+          if (errData?.error === "No valid formula found") {
+            alert("⚠ Không tìm thấy công thức phù hợp cho sản phẩm này!");
+          } else {
+            alert("Lỗi từ máy chủ: " + (errData?.error || "Không xác định"));
+          }
+
+          document.getElementById('loading').classList.add('hidden');
+          return;
+        }
+
+        // Nếu OK → lấy data
+        const data = await res.json();
+        document.getElementById('loading').classList.add('hidden');
+        displayResults(data);
+
+      } catch (err) {
+        // ❗ Lỗi network thực sự
+        document.getElementById('loading').classList.add('hidden');
+        alert("Không thể kết nối đến server. Vui lòng thử lại!");
+        console.error(err);
+      }
+    });
+
+  </script>
+
+</body>
+</html>
